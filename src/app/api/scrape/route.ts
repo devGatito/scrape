@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core"; // Usamos puppeteer-core en lugar de puppeteer
+import chromium from "@sparticuz/chromium"; // Importamos chromium compatible con Vercel
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -11,13 +12,11 @@ export async function GET(req: Request) {
 
   let browser;
   try {
+    // Configura Puppeteer para usar Chromium en Vercel
     browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-http2",
-      ],
+      args: chromium.args, // Usa los argumentos de Chromium
+      executablePath: await chromium.executablePath(), // Ruta al ejecutable de Chromium
+      headless: chromium.headless, // Modo headless
     });
 
     const page = await browser.newPage();
@@ -70,33 +69,30 @@ export async function GET(req: Request) {
     });
 
     // Obtener colores
-    
-
     const colors = await page.evaluate(() => {
       function rgbToHex(rgb: string) {
         const match = rgb.match(/\d+/g);
         if (!match || match.length < 3) return rgb; // Retorna original si no es un RGB válido
         return `#${match.slice(0, 3).map(x => ('0' + parseInt(x).toString(16)).slice(-2)).join('')}`;
       }
-    
+
       const colorSet = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
         colorSet.add(rgbToHex(computedStyle.color));
         colorSet.add(rgbToHex(computedStyle.backgroundColor));
       });
-    
+
       return Array.from(colorSet);
     });
-    
+
     await browser.close();
-    return NextResponse.json({ 
-      images: imageUrls, 
-      videos: videoUrls, 
-      fonts: fonts, 
-      colors: colors 
+    return NextResponse.json({
+      images: imageUrls,
+      videos: videoUrls,
+      fonts: fonts,
+      colors: colors,
     });
-    
   } catch (error) {
     console.error("Error en el servidor:", error);
     return NextResponse.json({ error: "No se pudo obtener la página" }, { status: 500 });
