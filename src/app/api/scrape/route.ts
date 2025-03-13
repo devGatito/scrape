@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -13,9 +12,12 @@ export async function GET(req: Request) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-http2",
+      ],
     });
 
     const page = await browser.newPage();
@@ -23,21 +25,11 @@ export async function GET(req: Request) {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     );
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    try {
-      await page.waitForSelector("body", { timeout: 5000 });
-    } catch {
-      console.warn("No se encontró el <body> en 5s, continuando...");
-    }
+    await page.waitForSelector("img", { timeout: 5000 }).catch(() => {});
 
-    // 📌 Extraer título y descripción
-    const { title, description } = await page.evaluate(() => ({
-      title: document.title,
-      description: document.querySelector("meta[name='description']")?.getAttribute("content") || "",
-    }));
-
-    // 📌 Obtener imágenes
+    // Obtener imágenes
     const imageUrls = await page.evaluate(() => {
       const images = Array.from(document.querySelectorAll("img"))
         .map((img) => img.src)
@@ -53,7 +45,7 @@ export async function GET(req: Request) {
       return Array.from(new Set([...images, ...bgImages]));
     });
 
-    // 📌 Obtener videos
+    // Obtener videos
     const videoUrls = await page.evaluate(() => {
       const videos = Array.from(document.querySelectorAll("video"))
         .map((video) => video.src)
@@ -66,66 +58,48 @@ export async function GET(req: Request) {
       return Array.from(new Set([...videos, ...iframes]));
     });
 
-    // 📌 Obtener fuentes
+    // Obtener fuentes
     const fonts = await page.evaluate(() => {
       const fontFamilies = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
-        fontFamilies.add(computedStyle.fontFamily);
+        const fontFamily = computedStyle.fontFamily;
+        fontFamilies.add(fontFamily);
       });
       return Array.from(fontFamilies);
     });
 
-    // 📌 Obtener colores
+    // Obtener colores
+    
+
     const colors = await page.evaluate(() => {
       function rgbToHex(rgb: string) {
         const match = rgb.match(/\d+/g);
-        if (!match || match.length < 3) return null;
+        if (!match || match.length < 3) return rgb; // Retorna original si no es un RGB válido
         return `#${match.slice(0, 3).map(x => ('0' + parseInt(x).toString(16)).slice(-2)).join('')}`;
       }
-
+    
       const colorSet = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
-        const textColor = rgbToHex(computedStyle.color);
-        const bgColor = rgbToHex(computedStyle.backgroundColor);
-        if (textColor) colorSet.add(textColor);
-        if (bgColor) colorSet.add(bgColor);
+        colorSet.add(rgbToHex(computedStyle.color));
+        colorSet.add(rgbToHex(computedStyle.backgroundColor));
       });
-
+    
       return Array.from(colorSet);
     });
-
-    // 📌 Obtener enlaces de la página
-    const links = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("a"))
-        .map((a) => a.href)
-        .filter((href) => href.startsWith("http"));
-    });
-
-    // 📌 Obtener scripts externos
-    const scripts = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("script[src]"))
-        .map((script) => (script as HTMLScriptElement).src)
-        .filter((src) => src.startsWith("http"));
-    });
-
-    await browser.close();
     
-    return NextResponse.json({
-      title,
-      description,
-      images: imageUrls,
-      videos: videoUrls,
-      fonts: fonts,
-      colors: colors,
-      links: links,
-      scripts: scripts,
+    await browser.close();
+    return NextResponse.json({ 
+      images: imageUrls, 
+      videos: videoUrls, 
+      fonts: fonts, 
+      colors: colors 
     });
-
+    
   } catch (error) {
-    console.error("Error en el scraping:", error);
-    return NextResponse.json({ error: "No se pudo obtener la página", details: (error as Error).message }, { status: 500 });
+    console.error("Error en el servidor:", error);
+    return NextResponse.json({ error: "No se pudo obtener la página" }, { status: 500 });
   } finally {
     if (browser) {
       await browser.close();
