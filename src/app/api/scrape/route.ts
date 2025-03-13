@@ -6,7 +6,10 @@ export async function GET(req: Request) {
   const url = searchParams.get("url");
 
   if (!url || url.trim() === "") {
-    return NextResponse.json({ error: "No se proporcionó una URL válida" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No se proporcionó una URL válida" },
+      { status: 400 }
+    );
   }
 
   let browser;
@@ -16,7 +19,12 @@ export async function GET(req: Request) {
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-http2",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-gpu",
       ],
     });
 
@@ -37,7 +45,9 @@ export async function GET(req: Request) {
 
       const bgImages = Array.from(document.querySelectorAll("[style]"))
         .map((el) => {
-          const match = (el as HTMLElement).style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
+          const match = (el as HTMLElement).style.backgroundImage.match(
+            /url\(["']?(.*?)["']?\)/
+          );
           return match ? match[1] : null;
         })
         .filter((url) => url && url.startsWith("http"));
@@ -70,36 +80,40 @@ export async function GET(req: Request) {
     });
 
     // Obtener colores
-    
 
     const colors = await page.evaluate(() => {
       function rgbToHex(rgb: string) {
         const match = rgb.match(/\d+/g);
         if (!match || match.length < 3) return rgb; // Retorna original si no es un RGB válido
-        return `#${match.slice(0, 3).map(x => ('0' + parseInt(x).toString(16)).slice(-2)).join('')}`;
+        return `#${match
+          .slice(0, 3)
+          .map((x) => ("0" + parseInt(x).toString(16)).slice(-2))
+          .join("")}`;
       }
-    
+
       const colorSet = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
         colorSet.add(rgbToHex(computedStyle.color));
         colorSet.add(rgbToHex(computedStyle.backgroundColor));
       });
-    
+
       return Array.from(colorSet);
     });
-    
+
     await browser.close();
-    return NextResponse.json({ 
-      images: imageUrls, 
-      videos: videoUrls, 
-      fonts: fonts, 
-      colors: colors 
+    return NextResponse.json({
+      images: imageUrls,
+      videos: videoUrls,
+      fonts: fonts,
+      colors: colors,
     });
-    
   } catch (error) {
     console.error("Error en el servidor:", error);
-    return NextResponse.json({ error: "No se pudo obtener la página" }, { status: 500 });
+    return NextResponse.json(
+      { error: "No se pudo obtener la página" },
+      { status: 500 }
+    );
   } finally {
     if (browser) {
       await browser.close();
