@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer-core";
-import chrome from "chrome-aws-lambda";
+import chromium from "@sparticuz/chromium";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -13,9 +13,9 @@ export async function GET(req: Request) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      args: chrome.args,
-      executablePath: await chrome.executablePath || "/usr/bin/chromium",
-      headless: chrome.headless,
+      args: chromium.args,
+      executablePath: await chromium.executablePath() || "/usr/bin/google-chrome-stable",
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
