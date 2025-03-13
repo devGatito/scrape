@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chrome from "chrome-aws-lambda";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,12 +13,9 @@ export async function GET(req: Request) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-http2",
-      ],
+      args: chrome.args,
+      executablePath: await chrome.executablePath || "/usr/bin/chromium",
+      headless: chrome.headless,
     });
 
     const page = await browser.newPage();
@@ -25,7 +23,7 @@ export async function GET(req: Request) {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     );
 
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
     await page.waitForSelector("img", { timeout: 5000 }).catch(() => {});
 
@@ -70,25 +68,23 @@ export async function GET(req: Request) {
     });
 
     // Obtener colores
-    
-
     const colors = await page.evaluate(() => {
       function rgbToHex(rgb: string) {
         const match = rgb.match(/\d+/g);
         if (!match || match.length < 3) return rgb; // Retorna original si no es un RGB válido
         return `#${match.slice(0, 3).map(x => ('0' + parseInt(x).toString(16)).slice(-2)).join('')}`;
       }
-    
+
       const colorSet = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
         colorSet.add(rgbToHex(computedStyle.color));
         colorSet.add(rgbToHex(computedStyle.backgroundColor));
       });
-    
+
       return Array.from(colorSet);
     });
-    
+
     await browser.close();
     return NextResponse.json({ 
       images: imageUrls, 
@@ -96,10 +92,10 @@ export async function GET(req: Request) {
       fonts: fonts, 
       colors: colors 
     });
-    
+
   } catch (error) {
     console.error("Error en el servidor:", error);
-    return NextResponse.json({ error: "No se pudo obtener la página" }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo obtener la página", details: (error as Error).message }, { status: 500 });
   } finally {
     if (browser) {
       await browser.close();
