@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   try {
     browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath() || "/usr/bin/google-chrome-stable",
+      executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });
 
