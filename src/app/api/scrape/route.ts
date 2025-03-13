@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
+import chromium from "@sparticuz/chromium";
 
 export async function GET(req: Request) {
   
@@ -16,7 +17,8 @@ export async function GET(req: Request) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
