@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   try {
     browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath() || puppeteer.executablePath(),
+      executablePath: await chromium.executablePath() || "/usr/bin/google-chrome-stable",
       headless: chromium.headless,
     });
 
@@ -25,16 +25,17 @@ export async function GET(req: Request) {
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-    // Esperar a que carguen elementos clave
-    await page.waitForSelector("body", { timeout: 5000 }).catch(() => {});
+    try {
+      await page.waitForSelector("body", { timeout: 5000 });
+    } catch {
+      console.warn("No se encontró el <body> en 5s, continuando...");
+    }
 
     // 📌 Extraer título y descripción
-    const { title, description } = await page.evaluate(() => {
-      return {
-        title: document.title,
-        description: document.querySelector("meta[name='description']")?.getAttribute("content") || "",
-      };
-    });
+    const { title, description } = await page.evaluate(() => ({
+      title: document.title,
+      description: document.querySelector("meta[name='description']")?.getAttribute("content") || "",
+    }));
 
     // 📌 Obtener imágenes
     const imageUrls = await page.evaluate(() => {
@@ -70,8 +71,7 @@ export async function GET(req: Request) {
       const fontFamilies = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
-        const fontFamily = computedStyle.fontFamily;
-        fontFamilies.add(fontFamily);
+        fontFamilies.add(computedStyle.fontFamily);
       });
       return Array.from(fontFamilies);
     });
@@ -124,7 +124,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error) {
-    console.error("Error en el servidor:", error);
+    console.error("Error en el scraping:", error);
     return NextResponse.json({ error: "No se pudo obtener la página", details: (error as Error).message }, { status: 500 });
   } finally {
     if (browser) {

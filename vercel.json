@@ -1,0 +1,8 @@
+{
+    "functions": {
+      "api/scrape/route.ts": {
+        "runtime": "nodejs18.x"
+      }
+    }
+  }
+  
