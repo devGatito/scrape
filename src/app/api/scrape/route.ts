@@ -25,9 +25,18 @@ export async function GET(req: Request) {
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-    await page.waitForSelector("img", { timeout: 5000 }).catch(() => {});
+    // Esperar a que carguen elementos clave
+    await page.waitForSelector("body", { timeout: 5000 }).catch(() => {});
 
-    // Obtener imágenes
+    // 📌 Extraer título y descripción
+    const { title, description } = await page.evaluate(() => {
+      return {
+        title: document.title,
+        description: document.querySelector("meta[name='description']")?.getAttribute("content") || "",
+      };
+    });
+
+    // 📌 Obtener imágenes
     const imageUrls = await page.evaluate(() => {
       const images = Array.from(document.querySelectorAll("img"))
         .map((img) => img.src)
@@ -43,7 +52,7 @@ export async function GET(req: Request) {
       return Array.from(new Set([...images, ...bgImages]));
     });
 
-    // Obtener videos
+    // 📌 Obtener videos
     const videoUrls = await page.evaluate(() => {
       const videos = Array.from(document.querySelectorAll("video"))
         .map((video) => video.src)
@@ -56,7 +65,7 @@ export async function GET(req: Request) {
       return Array.from(new Set([...videos, ...iframes]));
     });
 
-    // Obtener fuentes
+    // 📌 Obtener fuentes
     const fonts = await page.evaluate(() => {
       const fontFamilies = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
@@ -67,30 +76,51 @@ export async function GET(req: Request) {
       return Array.from(fontFamilies);
     });
 
-    // Obtener colores
+    // 📌 Obtener colores
     const colors = await page.evaluate(() => {
       function rgbToHex(rgb: string) {
         const match = rgb.match(/\d+/g);
-        if (!match || match.length < 3) return rgb; // Retorna original si no es un RGB válido
+        if (!match || match.length < 3) return null;
         return `#${match.slice(0, 3).map(x => ('0' + parseInt(x).toString(16)).slice(-2)).join('')}`;
       }
 
       const colorSet = new Set<string>();
       document.querySelectorAll("*").forEach((element) => {
         const computedStyle = window.getComputedStyle(element);
-        colorSet.add(rgbToHex(computedStyle.color));
-        colorSet.add(rgbToHex(computedStyle.backgroundColor));
+        const textColor = rgbToHex(computedStyle.color);
+        const bgColor = rgbToHex(computedStyle.backgroundColor);
+        if (textColor) colorSet.add(textColor);
+        if (bgColor) colorSet.add(bgColor);
       });
 
       return Array.from(colorSet);
     });
 
+    // 📌 Obtener enlaces de la página
+    const links = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("a"))
+        .map((a) => a.href)
+        .filter((href) => href.startsWith("http"));
+    });
+
+    // 📌 Obtener scripts externos
+    const scripts = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("script[src]"))
+        .map((script) => (script as HTMLScriptElement).src)
+        .filter((src) => src.startsWith("http"));
+    });
+
     await browser.close();
-    return NextResponse.json({ 
-      images: imageUrls, 
-      videos: videoUrls, 
-      fonts: fonts, 
-      colors: colors 
+    
+    return NextResponse.json({
+      title,
+      description,
+      images: imageUrls,
+      videos: videoUrls,
+      fonts: fonts,
+      colors: colors,
+      links: links,
+      scripts: scripts,
     });
 
   } catch (error) {
