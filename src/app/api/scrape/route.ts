@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
 
 export async function GET(req: Request) {
+  
   const { searchParams } = new URL(req.url);
   const url = searchParams.get("url");
 
