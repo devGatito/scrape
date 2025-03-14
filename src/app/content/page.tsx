@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 export default function Content() {
   const [images, setImages] = useState<string[]>([]);
@@ -58,7 +59,7 @@ export default function Content() {
           <div className="flex flex-wrap gap-2 mt-2">
             {images.map((img, idx) => (
               <div key={idx} className="relative">
-                <img
+                <Image
                   src={img}
                   alt={`Imagen ${idx}`}
                   width={100}

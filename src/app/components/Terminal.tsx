@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDraggableResizable } from "../hooks/useDraggableResizable";
 import { useRouter } from "next/navigation";
 
@@ -30,7 +30,7 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
   const router = useRouter();
 
   // ✅ Función de extracción de datos
-  const extractData = async () => {
+  const extractData = useCallback(async () => {
     console.log("🔍 URL recibida:", url);
     if (!url.trim()) {
       setError("Confirma la URL");
@@ -64,14 +64,14 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [url]);
 
   // ✅ Ejecuta `extractData` cuando `url` cambie
   useEffect(() => {
     if (url.trim()) {
       extractData();
     }
-  }, [url]);
+  }, [extractData, url]);
 
   // ✅ Manejo de la responsividad
   useEffect(() => {

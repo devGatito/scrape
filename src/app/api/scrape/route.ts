@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
-import { chromium, firefox, webkit } from "playwright";
+import { NextResponse, NextRequest } from "next/server";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
+export async function GET(req: NextRequest) {
+  const { searchParams } = req.nextUrl;
   const url = searchParams.get("url");
-  const browserType = searchParams.get("browser");
 
   if (!url || url.trim() === "") {
     return NextResponse.json(
@@ -13,82 +11,56 @@ export async function GET(req: Request) {
     );
   }
 
-  let browser;
   try {
-    // Seleccionar navegador dinámicamente
-    const browserInstance =
-      browserType === "firefox"
-        ? firefox
-        : browserType === "webkit"
-        ? webkit
-        : chromium;
-
-    browser = await browserInstance.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Necesario en Vercel
-      executablePath: browserInstance.executablePath(), // Usa el path correcto en Vercel
-      headless: true,
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+      },
     });
 
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-    });
+    if (!response.ok) {
+      throw new Error(`Error al obtener la página: ${response.statusText}`);
+    }
 
-    await page.goto(url, { waitUntil: "networkidle" });
+    const html = await response.text();
 
-    // Obtener imágenes
-    const imageUrls = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("img"))
-        .map((img) => img.src)
-        .filter((src) => src.startsWith("http"))
-    );
+    // Base URL para convertir rutas relativas a absolutas
+    const baseUrl = new URL(url);
 
-    // Obtener videos
-    const videoUrls = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("video"))
-        .map((video) => video.src)
-        .filter((src) => src.startsWith("http"))
-    );
+    // Función para convertir rutas relativas en absolutas
+    const makeAbsolute = (src: string) =>
+      src.startsWith("http") ? src : new URL(src, baseUrl).href;
 
-    // Obtener fuentes
-    const fonts = await page.evaluate(() => {
-      const fontFamilies = new Set();
-      document.querySelectorAll("*").forEach((element) => {
-        const computedStyle = window.getComputedStyle(element);
-        fontFamilies.add(computedStyle.fontFamily);
-      });
-      return Array.from(fontFamilies);
-    });
+    const imageUrls = [
+      ...html.matchAll(/<img[^>]+src=["']([^"']+)["']/g),
+    ].map((m) => makeAbsolute(m[1]));
 
-    // Obtener colores
-    const colors = await page.evaluate(() => {
-      function rgbToHex(rgb: string) {
-        const match = rgb.match(/\d+/g);
-        if (!match || match.length < 3) return rgb;
-        return `#${match
-          .slice(0, 3)
-          .map((x) => ("0" + parseInt(x).toString(16)).slice(-2))
-          .join("")}`;
-      }
+    const videoUrls = [
+      ...html.matchAll(/<video[^>]+src=["']([^"']+)["']/g),
+    ].map((m) => makeAbsolute(m[1]));
 
-      const colorSet = new Set();
-      document.querySelectorAll("*").forEach((element) => {
-        const computedStyle = window.getComputedStyle(element);
-        colorSet.add(rgbToHex(computedStyle.color));
-        colorSet.add(rgbToHex(computedStyle.backgroundColor));
-      });
+    const fontUrls = [
+      ...html.matchAll(/@font-face\s*\{[^}]*url\(["']([^"']+)["']\)/g),
+    ].map((m) => makeAbsolute(m[1]));
 
-      return Array.from(colorSet);
-    });
-
-    await browser.close();
+    // Captura más flexible de colores en estilos inline
+    const colorMatches = [
+      ...html.matchAll(/style=["'][^"']*color:\s*([^;'" >]+)/gi),
+    ];
+    const backgroundMatches = [
+      ...html.matchAll(/style=["'][^"']*background(?:-color)?:\s*([^;'" >]+)/gi),
+    ];
+    const colors = new Set([
+      ...colorMatches.map((m) => m[1]),
+      ...backgroundMatches.map((m) => m[1]),
+    ]);
 
     return NextResponse.json({
       images: imageUrls,
       videos: videoUrls,
-      fonts: fonts,
-      colors: colors,
+      fonts: fontUrls,
+      colors: [...colors],
     });
   } catch (error) {
     console.error("Error en el servidor:", error);
@@ -96,9 +68,5 @@ export async function GET(req: Request) {
       { error: "No se pudo obtener la página" },
       { status: 500 }
     );
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
