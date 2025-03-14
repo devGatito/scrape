@@ -4,7 +4,7 @@ import { chromium, firefox, webkit } from "playwright";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const url = searchParams.get("url");
-  const browserType = searchParams.get("browser") || "chromium"; // Opciones: chromium, firefox, webkit
+  const browserType = searchParams.get("browser");
 
   if (!url || url.trim() === "") {
     return NextResponse.json(
@@ -16,19 +16,23 @@ export async function GET(req: Request) {
   let browser;
   try {
     // Seleccionar navegador dinámicamente
-    const browserInstance = browserType === "firefox"
-      ? firefox
-      : browserType === "webkit"
-      ? webkit
-      : chromium;
+    const browserInstance =
+      browserType === "firefox"
+        ? firefox
+        : browserType === "webkit"
+        ? webkit
+        : chromium;
 
     browser = await browserInstance.launch({
-      headless: true, // Cambia a false si quieres ver la navegación
+      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Necesario en Vercel
+      executablePath: browserInstance.executablePath(), // Usa el path correcto en Vercel
+      headless: true,
     });
 
     const page = await browser.newPage();
     await page.setExtraHTTPHeaders({
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
     });
 
     await page.goto(url, { waitUntil: "networkidle" });
@@ -86,7 +90,6 @@ export async function GET(req: Request) {
       fonts: fonts,
       colors: colors,
     });
-
   } catch (error) {
     console.error("Error en el servidor:", error);
     return NextResponse.json(

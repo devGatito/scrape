@@ -1,8 +1,9 @@
 {
-    "functions": {
-      "api/scrape/route": {
-        "memory": 3008,
-        "maxDuration": 30
-      }
+  "functions": {
+    "api/scrape": {
+      "runtime": "nodejs20.x",
+      "includeFiles": [".cache"]
     }
-  }
+  },
+  "installCommand": "npx playwright install chromium"
+}
