@@ -10,15 +10,21 @@ export default function Content() {
   
   useEffect(() => {
     const storedImages = localStorage.getItem("images");
-    const storedVideos = localStorage.getItem("videos");
-    const storedFonts = localStorage.getItem("fonts");
-    const storedColors = localStorage.getItem("colors");
+  const storedVideos = localStorage.getItem("videos");
+  const storedFonts = localStorage.getItem("fonts");
+  const storedColors = localStorage.getItem("colors");
 
-    if (storedImages) setImages(JSON.parse(storedImages));
-    if (storedVideos) setVideos(JSON.parse(storedVideos));
-    if (storedFonts) setFonts(JSON.parse(storedFonts));
-    if (storedColors) setColors(JSON.parse(storedColors));
-  }, []);
+  console.log("Recuperando datos de localStorage:");
+  console.log("Images:", storedImages);
+  console.log("Videos:", storedVideos);
+  console.log("Fonts:", storedFonts);
+  console.log("Colors:", storedColors);
+
+  if (storedImages) setImages(JSON.parse(storedImages));
+  if (storedVideos) setVideos(JSON.parse(storedVideos));
+  if (storedFonts) setFonts(JSON.parse(storedFonts));
+  if (storedColors) setColors(JSON.parse(storedColors));
+}, []);
 
  
 

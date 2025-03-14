@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useDraggableResizable } from "../hooks/useDraggableResizable";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 
 interface TerminalProps {
   url: string;
@@ -28,18 +28,10 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
   const [extractionSuccess, setExtractionSuccess] = useState(false);
 
   const router = useRouter();
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
 
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
+  // ✅ Función de extracción de datos
   const extractData = async () => {
+    console.log("🔍 URL recibida:", url);
     if (!url.trim()) {
       setError("Confirma la URL");
       return;
@@ -47,39 +39,52 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
 
     setLoading(true);
     setError("");
-    setExtractionSuccess(false); 
+    setExtractionSuccess(false);
 
     try {
       const response = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
 
       if (!response.ok) {
+        console.error("Error en la API:", response.status, await response.text());
         throw new Error(`Error al obtener datos: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log("📌 Datos obtenidos de la API:", data);
 
       localStorage.setItem("images", JSON.stringify(data.images ?? []));
       localStorage.setItem("videos", JSON.stringify(data.videos ?? []));
       localStorage.setItem("fonts", JSON.stringify(data.fonts ?? []));
       localStorage.setItem("colors", JSON.stringify(data.colors ?? []));
 
-     
       setExtractionSuccess(true);
     } catch (error) {
       console.error("Error al extraer datos:", error);
       setError("No se pudo extraer datos.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  
+  // ✅ Ejecuta `extractData` cuando `url` cambie
   useEffect(() => {
-    if (url) {
+    if (url.trim()) {
       extractData();
     }
   }, [url]);
 
-  
+  // ✅ Manejo de la responsividad
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // ✅ Función para redirigir a /content
   const handleRedirectToContent = () => {
     router.push("/content");
   };
@@ -97,7 +102,6 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
         isMobile ? "rounded-none" : "rounded-lg"
       }`}
     >
-      
       <div
         className="flex items-center px-3 py-2 bg-gray-800 border-b border-gray-700 rounded-t-lg cursor-move"
         onMouseDown={handleMouseDown}
@@ -110,12 +114,10 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
         <span className="ml-auto text-gray-400 text-xs">terminal</span>
       </div>
 
-     
       <div className="p-4 text-green-400 font-mono whitespace-pre-wrap h-[80%] overflow-auto">
         {loading && <p>Cargando datos...</p>}
         {error && <p className="text-red-500">{error}</p>}
 
-       
         {!loading && !error && extractionSuccess && (
           <div className="mb-4">
             <h3 className="text-lg font-bold mb-2">Extracción exitosa</h3>
@@ -124,7 +126,7 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
             </p>
             <button
               onClick={handleRedirectToContent}
-              className=" text-white px-4 py-2 rounded-lg  transition-colors"
+              className="text-white px-4 py-2 rounded-lg transition-colors"
             >
               Ver contenido
             </button>
@@ -132,7 +134,6 @@ export default function Terminal({ url, onClose, position }: TerminalProps) {
         )}
       </div>
 
-      
       {!isMobile && (
         <div
           className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-gray-700"
