@@ -2,7 +2,7 @@
   "functions": {
     "api/scrape": {
       "runtime": "nodejs20.x",
-      "includeFiles": [".cache"]
+      "includeFiles": ".cache"
     }
   },
   "installCommand": "npx playwright install chromium"
